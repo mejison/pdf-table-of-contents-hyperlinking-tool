@@ -1,0 +1,91 @@
+name: ci
+
+on:
+  workflow_call:
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    env:
+      DB_HOST: 127.0.0.1
+      DB_DATABASE: aa_amer_services
+      DB_USERNAME: sailuser
+      DB_PASSWORD: password
+      BROADCAST_DRIVER: log
+      CACHE_DRIVER: redis
+      QUEUE_CONNECTION: redis
+      SESSION_DRIVER: redis
+
+    # Docs: https://docs.github.com/en/actions/using-containerized-services
+    services:
+      mysql:
+        image: mysql:latest
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: false
+          MYSQL_ROOT_PASSWORD: secret
+          MYSQL_DATABASE: aa_amer_services
+          MYSQL_USER: sailuser
+          MYSQL_PASSWORD: password
+        ports:
+          - 3306/tcp
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+      redis:
+        image: redis
+        ports:
+          - 6379/tcp
+        options: --health-cmd="redis-cli ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+    steps:
+      - name: Checkout 🛎
+        uses: actions/checkout@v3
+
+      - name: Verify MySQL connection ❤️
+        run: |
+          mysql --version
+          sudo apt-get install -y mysql-client
+          mysql --host 127.0.0.1 --port ${{ job.services.mysql.ports['3306'] }} -uroot -psecret <<< "SHOW DATABASES"
+
+      - name: Setup PHP 🏗
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.2
+          tools: composer:v2
+          coverage: xdebug
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, gd, exif, iconv, imagick, fileinfo, mysql
+
+      - name: Install Project Dependencies 💻
+        run: |
+          composer config --unset repositories.blinq/synth
+          composer remove --dev blinq/synth
+          composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: List Installed Dependencies 📦
+        run: composer show -D
+
+      - name: Boot Laravel application 🥾
+        run: |
+          php artisan --version
+          php artisan env:decrypt --env=testing
+        env:
+          LARAVEL_ENV_ENCRYPTION_KEY: ${{ secrets.LARAVEL_ENV_ENCRYPTION_KEY }}
+          DB_PORT: ${{ job.services.mysql.ports['3306'] }}
+          REDIS_PORT: ${{ job.services.redis.ports['6379'] }}
+
+      - name: Migrate database 📇
+        run: |
+          mysql --version
+          php artisan migrate:fresh --seed --force
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: ${{ job.services.mysql.ports['3306'] }}
+          REDIS_PORT: ${{ job.services.redis.ports['6379'] }}
+
+      - name: Run tests 🧪
+        run: |
+          ./vendor/bin/pest  --version
+          ./vendor/bin/pest
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: ${{ job.services.mysql.ports['3306'] }}
+          REDIS_PORT: ${{ job.services.redis.ports['6379'] }}
