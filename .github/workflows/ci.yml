@@ -56,8 +56,6 @@ jobs:
 
       - name: Install Project Dependencies 💻
         run: |
-          composer config --unset repositories.blinq/synth
-          composer remove --dev blinq/synth
           composer install --no-interaction --prefer-dist --optimize-autoloader
 
       - name: List Installed Dependencies 📦
@@ -66,9 +64,7 @@ jobs:
       - name: Boot Laravel application 🥾
         run: |
           php artisan --version
-          php artisan env:decrypt --env=testing
         env:
-          LARAVEL_ENV_ENCRYPTION_KEY: ${{ secrets.LARAVEL_ENV_ENCRYPTION_KEY }}
           DB_PORT: ${{ job.services.mysql.ports['3306'] }}
           REDIS_PORT: ${{ job.services.redis.ports['6379'] }}
 
