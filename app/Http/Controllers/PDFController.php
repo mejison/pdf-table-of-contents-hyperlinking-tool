@@ -4,11 +4,13 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Http\Requests\PDF\AnalysisRequest;
+use App\Events\PDF\Uploaded;
 
 class PDFController extends Controller
 {
     const TEMP_DIR = 'app/public/temp/';
     const PUBLIC_DIR = 'storage/temp/';
+    const ALLOWED_FILES = ['application/pdf'];
 
     /**
      * Analysis the PDF file.
@@ -27,15 +29,25 @@ class PDFController extends Controller
                     ->with('errors', $errors);
         }
 
-        $filename = basename($url);
+        $filename = time() . '-' . basename($url);
         if ( ! file_exists(storage_path(self::TEMP_DIR))) {
             mkdir(storage_path(self::TEMP_DIR));
         }
+        $tempFilename = storage_path(self::TEMP_DIR . $filename);
+        file_put_contents($tempFilename, $content);
+
+        $mimeType = mime_content_type($tempFilename);
+        if( ! in_array($mimeType, self::ALLOWED_FILES)) {
+            $errors = $this->addErrorMessage('mime_content_type', "The file must be of PDF type");
+                return redirect()
+                        ->back()
+                        ->with('errors', $errors);
+        }
+
+        Uploaded::dispatch($tempFilename);
+
+        $outputPDF = ''; //asset(self::PUBLIC_DIR . $filename);
         
-        file_put_contents(storage_path(self::TEMP_DIR . $filename), $content);
-
-        $outputPDF = asset(self::PUBLIC_DIR . $filename);
-
         return redirect()
                 ->back()
                 ->withInput()
