@@ -13,6 +13,10 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
+use App\Http\Controllers\PDFController;
+
 Route::get('/', function () {
     return view('welcome');
 });
+
+Route::post('/analysis-pdf', [PDFController::class, 'analysis']);

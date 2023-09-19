@@ -35,15 +35,39 @@
                                     <div class="mb-4 mt-2">
                                         <input 
                                             class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" 
-                                            id="username" 
+                                            id="file" 
                                             type="url" 
+                                            name="file"
                                             placeholder="https://storage.googleapis.com ..."
+                                            value="{{ old('file') }}"
                                             required
                                         />
-                                      </div>
+                                    </div>
+                                    @if ($errors->any())
+                                        <div class="mb-2">
+                                            <ul>
+                                                @foreach ($errors->all() as $error)
+                                                    <li class="text-red-400 text-sm">{{ $error }}</li>
+                                                @endforeach
+                                            </ul>
+                                        </div>
+                                    @endif
+                                    @if (session('success'))
+                                        <div class="mb-2">
+                                            <span class="text-green-400 text-sm">{{ session('success') }}</span>
+                                        </div>
+                                    @endif
                                     <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
                                         Submit
                                     </button>
+                                    @if (session('success'))
+                                        <button type="button" onClick="copyToClipboard('{{ session('file') }}')" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                                            Copy URL to clipboard
+                                        </button>
+                                        <button type="button" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                                            Upload to Google Drive
+                                        </button>
+                                    @endif
                                 </div>
                             </form>
                         </div>
@@ -51,5 +75,28 @@
                 </div>
             </div>
         </div>
+        <script>
+            (function(w, d) {
+                w.addEventListener('load', init, false);
+
+                function init() {
+                    // ... init
+                }
+
+                w.copyToClipboard = function(string) {
+                    const el = document.createElement('textarea');
+                    el.value = string;
+                    el.setAttribute('readonly', '');
+                    el.style.position = 'absolute';
+                    el.style.left = '-9999px';
+                    document.body.appendChild(el);
+                    el.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(el);
+
+                    alert('Copied to clipboard!')
+                }
+            })(window, document);
+        </script>
     </body>
 </html>
