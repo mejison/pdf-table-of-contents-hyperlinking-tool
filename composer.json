@@ -10,7 +10,9 @@
         "laravel/framework": "^10.10",
         "laravel/sanctum": "^3.2",
         "laravel/tinker": "^2.8",
-        "sammyjo20/laravel-haystack": "^0.12.0"
+        "sammyjo20/laravel-haystack": "^0.12.0",
+        "spatie/pdf-to-text": "^1.52",
+        "tecnickcom/tcpdf": "^6.6"
     },
     "require-dev": {
         "barryvdh/laravel-ide-helper": "^2.13",
