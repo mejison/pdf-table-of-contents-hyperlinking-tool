@@ -37,8 +37,8 @@ class ExtractingTexFromPDF
             }
         }
 
-        $pdf->Output();  
-        // $pdf->Output($outputFilename, 'F');
+        // $pdf->Output();  
+        $pdf->Output($outputFilename, 'F');
     }
 
     private function TableOfContentpage($pdf, $indexPage, $filePath, $items) {
