@@ -1,5 +1,6 @@
 <?php
 
+
 namespace App\Listeners\PDF;
 
 use App\Events\PDF\Uploaded;
@@ -7,6 +8,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 use Spatie\PdfToText\Pdf;
 use TCPDF;
+use setasign\Fpdi\Tcpdf\Fpdi;
 
 class ExtractingTexFromPDF
 {
@@ -18,51 +20,67 @@ class ExtractingTexFromPDF
      */
     public function handle(Uploaded $event)
     {
+        ini_set('memory_limit', '-1');
+
         $path = $event->path;
         $outputFilename = $event->outputfilename;
+        $targetPages = $this->searchPageWithTableOfContent($path);
 
-        $text = (new Pdf('/usr/local/bin/pdftotext'))
-            ->setPdf($path)
-            ->text();
+        $pdf = new Fpdi();
+        $pageCount = $pdf->setSourceFile($path); // get total page
         
-        preg_match_all("/([\d\w]*)\s*\.{10,}\s*(\d*)/i", $text, $results);
-
-        if(count($results)) {
-            array_shift($results);
-            $results = array_combine($results[0], $results[1]);
-            $this->createPDFfile($results, $outputFilename);
+        for($page = 1; $page <= $pageCount; $page ++) {
+            if (in_array($page - 1, array_keys($targetPages))) {
+                $this->TableOfContentpage($pdf, $page, $path, $targetPages[$page - 1]);
+            } else {
+                $this->importPage($pdf, $page, $path);
+            }
         }
+
+        // $pdf->Output();  
+        $pdf->Output($outputFilename, 'F');
     }
 
-    private function createPDFfile(array $items, string $outputFilename) { // table of content
-        $pdf = new TCPDF(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
-
-        $pdf->setFooterData(array(0,64,0), array(0,64,128));
-
-        $pdf->setHeaderFont(Array(PDF_FONT_NAME_MAIN, '', PDF_FONT_SIZE_MAIN));
-        $pdf->setFooterFont(Array(PDF_FONT_NAME_DATA, '', PDF_FONT_SIZE_DATA));
-
-        $pdf->SetDefaultMonospacedFont(PDF_FONT_MONOSPACED);
-
-        $pdf->SetMargins(PDF_MARGIN_LEFT, PDF_MARGIN_TOP, PDF_MARGIN_RIGHT);
-        $pdf->SetHeaderMargin(PDF_MARGIN_HEADER);
-        $pdf->SetFooterMargin(PDF_MARGIN_FOOTER);
-        $pdf->SetAutoPageBreak(TRUE, PDF_MARGIN_BOTTOM);
-
-        $pdf->setImageScale(PDF_IMAGE_SCALE_RATIO);
-        $pdf->setFontSubsetting(true);
-        $pdf->SetFont('dejavusans', '', 14, '', true);
+    private function TableOfContentpage($pdf, $indexPage, $filePath, $items) {
         $pdf->AddPage();
-
-        $pdf->setTextShadow(array('enabled'=>true, 'depth_w'=>0.2, 'depth_h'=>0.2, 'color'=>array(196,196,196), 'opacity'=>1, 'blend_mode'=>'Normal'));
-
         collect($items)->each(function($page, $title) use (&$pdf) {
             $index_link = $pdf->AddLink();
             $pdf->SetLink($index_link, 0, '*' . $page);
-            $pdf->Cell(0, 10, $title . str_repeat('.', 90) . $page, 0, 1, 'R', false, $index_link);
+            
+            $titleLength = mb_strlen($title);
+            $pdf->Cell(0, 8, $title . str_repeat('.', 130 - $titleLength) . $page, 0, 1, 'L', false, $index_link);
         });
+    }
 
-        $pdf->writeHTMLCell(0, 0, '', '', str_repeat('<br />', 1000), 0, 1, 0, true, '', true);
-        $pdf->Output($outputFilename, 'F');
+    private function importPage($pdf, $indexPage, $filePath) {
+        $pdf->AddPage();
+    
+        $pdf->setSourceFile($filePath);
+        $tplId = $pdf->importPage($indexPage);
+        $pageSize = $pdf->getImportedPageSize($tplId);
+    
+        $pdf->useTemplate($tplId, 0, 0, $pageSize['width'], $pageSize['height'], $pageSize['orientation']);
+    }
+
+    private function searchPageWithTableOfContent($file) {
+        $parser = new \Smalot\PdfParser\Parser();
+        $pdf = $parser->parseFile($file);
+        $pages = $pdf->getPages();
+        $target = [];
+
+        for($page = 0; $page < count($pages); $page ++) {
+            $text = $pages[$page]->getText();
+            $text = str_replace(['\\',  "\r"], '', $text);
+            preg_match_all("/(.*)\s*[\.\/]{10,}\s*(\d{1,3})/im", $text, $results);
+            if(count($results)) {
+                array_shift($results);
+                $results[0] = array_map(function($item) {
+                    return trim(str_replace(['\\',  "\r", "\n", ".", "\t"], '', $item));
+                }, $results[0]);
+                $results = array_combine($results[0], $results[1]);
+                $target[$page] = $results;
+            }
+        }
+        return array_filter($target);
     }
 }
