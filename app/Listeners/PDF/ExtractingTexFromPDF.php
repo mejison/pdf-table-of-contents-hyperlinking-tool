@@ -37,19 +37,29 @@ class ExtractingTexFromPDF
             }
         }
 
-        // $pdf->Output();  
-        $pdf->Output($outputFilename, 'F');
+        $pdf->Output();  
+        // $pdf->Output($outputFilename, 'F');
     }
 
     private function TableOfContentpage($pdf, $indexPage, $filePath, $items) {
-        $pdf->AddPage();
-        collect($items)->each(function($page, $title) use (&$pdf) {
+        $p = $pdf->addTOCPage();    
+
+        $pdf->SetFont('dejavusans', 'B', 16);
+        $pdf->MultiCell(0, 0, 'Table Of Content', 0, 'C', 0, 1, '', '', true, 0);
+        $pdf->Ln();
+
+        $pdf->SetFont('dejavusans', '', 12);
+    
+        collect($items)->each(function($page, $title) use (&$pdf, &$p, &$index) {
+            
             $index_link = $pdf->AddLink();
             $pdf->SetLink($index_link, 0, '*' . $page);
             
-            $titleLength = mb_strlen($title);
-            $pdf->Cell(0, 8, $title . str_repeat('.', 130 - $titleLength) . $page, 0, 1, 'L', false, $index_link);
+            $titleLength = strlen($title);
+            $pdf->Cell(0, 8, $title . str_repeat('.', 100 - $titleLength) . $page, 0, 1, 'L', false, $index_link);
         });
+        $pdf->endTOCPage();
+
     }
 
     private function importPage($pdf, $indexPage, $filePath) {
